@@ -115,10 +115,11 @@ public class PacStudentController : MonoBehaviour
         );
         return hit == null;
     }
+    private bool canTeleport = true;
     void OnTriggerEnter2D(Collider2D other)
     {
+        if (!canTeleport) return;
         if (GameManager.I == null) return;
-        Debug.Log("触发到：" + other.name);
         if (other.CompareTag("Pellet"))
         {
             GameManager.I.AddScore(10);
@@ -159,12 +160,20 @@ public class PacStudentController : MonoBehaviour
         }
         else if (other.name.Contains("TeleporterLeft"))
         {
-            transform.position = new Vector3(8.6f, 1f, 0f);
+            transform.position = new Vector3(7.6f, 1f, 0f);
+            StartCoroutine(TeleportCooldown());
         }
         else if (other.name.Contains("TeleporterRight"))
         {
-            transform.position = new Vector3(-8.5f, 1f, 0f);
+            transform.position = new Vector3(-7.5f, 1f, 0f);
+            StartCoroutine(TeleportCooldown());
         }
+    }
+    private IEnumerator TeleportCooldown()
+    {
+        canTeleport = false;
+        yield return new WaitForSeconds(0.5f);
+        canTeleport = true;
     }
     void OnCollisionEnter2D(Collision2D collision)
     {

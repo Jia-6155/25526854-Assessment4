@@ -4936,7 +4936,7 @@ Camera:
     serializedVersion: 2
     x: 0
     y: 0
-    width: 0.9980507
+    width: 0.9980807
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
@@ -5189,7 +5189,7 @@ MonoBehaviour:
   spawnPoint: {fileID: 1682430631}
   homePoint: {fileID: 848841128}
   deadReturnSpeed: 3
-  moveSpeed: 3
+  moveSpeed: 2.8
   gridSize: 0.5
   wallMask:
     serializedVersion: 2
@@ -5844,7 +5844,7 @@ GameObject:
   - component: {fileID: 633124373}
   - component: {fileID: 633124374}
   - component: {fileID: 633124375}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: TeleporterLeft
   m_TagString: TeleporterLeft
   m_Icon: {fileID: 0}
@@ -13950,7 +13950,7 @@ GameObject:
   - component: {fileID: 1611891247}
   - component: {fileID: 1611891248}
   - component: {fileID: 1611891249}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: TeleporterRight
   m_TagString: TeleporterRight
   m_Icon: {fileID: 0}
@@ -16785,7 +16785,7 @@ MonoBehaviour:
   spawnPoint: {fileID: 776185667}
   homePoint: {fileID: 848841128}
   deadReturnSpeed: 3
-  moveSpeed: 3
+  moveSpeed: 3.5
   gridSize: 0.5
   wallMask:
     serializedVersion: 2
@@ -17942,7 +17942,7 @@ MonoBehaviour:
   spawnPoint: {fileID: 277907140}
   homePoint: {fileID: 848841128}
   deadReturnSpeed: 3
-  moveSpeed: 3
+  moveSpeed: 3.2
   gridSize: 0.5
   wallMask:
     serializedVersion: 2

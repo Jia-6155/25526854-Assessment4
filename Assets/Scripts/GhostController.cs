@@ -20,6 +20,9 @@ public class GhostController : MonoBehaviour
     private Vector2Int gridPos;
     private Vector2Int currentDir = Vector2Int.left;
     private bool IsMobileState => CurrentState != GhostState.Dead;
+    private PacStudentController pac;
+    private float baseSpeed;
+    private int ghostType = 1;
     private void HardStop()
     {
         if (moveRoutine != null)
@@ -41,7 +44,9 @@ public class GhostController : MonoBehaviour
     private void Awake()
     {
         anim = GetComponent<Animator>();
+        pac = FindFirstObjectByType<PacStudentController>();
         SetAnim();
+        baseSpeed = moveSpeed;
     }
     public GhostState CurrentState { get; private set; } = GhostState.Normal;
     private void EnsureMoving()
@@ -57,15 +62,20 @@ public class GhostController : MonoBehaviour
         );
         transform.position = snapped;
         gridPos = Vector2Int.RoundToInt(snapped / gridSize);
-        if (name.Contains("Red")) currentDir = Vector2Int.right;
-        else if (name.Contains("Blue")) currentDir = Vector2Int.left;
-        else if (name.Contains("Pink")) currentDir = Vector2Int.up;
-        else if (name.Contains("Orange")) currentDir = Vector2Int.down;
+        if (name.Contains("Red")) { currentDir = Vector2Int.right; ghostType = 1; }
+        else if (name.Contains("Blue")) { currentDir = Vector2Int.left; ghostType = 2; }
+        else if (name.Contains("Pink")) { currentDir = Vector2Int.up; ghostType = 3; }
+        else if (name.Contains("Orange")) { currentDir = Vector2Int.down; ghostType = 4; }
         else currentDir = Vector2Int.left;
         StartCoroutine(DelayedStart());
+        SetMovable(true);
     }
     private void Update()
     {
+        if (CurrentState == GhostState.Normal)
+            moveSpeed = baseSpeed * 0.9f;
+        else
+            moveSpeed = baseSpeed * 0.9f * 0.5f;
         if (!movable) return;
         if (CurrentState == GhostState.Scared || CurrentState == GhostState.Recovering)
         {
@@ -84,28 +94,78 @@ public class GhostController : MonoBehaviour
     }
     private void TryStep(Vector2Int dir)
     {
-        if (!CanMove(dir))
+        Vector2Int nextDir = currentDir;
+        if (CurrentState == GhostState.Dead)
+        {
+            Vector2 toHome = (homePoint.position - transform.position);
+            if (Mathf.Abs(toHome.x) > Mathf.Abs(toHome.y))
+                nextDir = new Vector2Int((int)Mathf.Sign(toHome.x), 0);
+            else
+                nextDir = new Vector2Int(0, (int)Mathf.Sign(toHome.y));
+        }
+        else
         {
             List<Vector2Int> dirs = new List<Vector2Int>
             {
                 Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right
             };
-            dirs.Remove(-dir);
+            dirs.Remove(-currentDir);
+            List<Vector2Int> valid = new List<Vector2Int>();
             foreach (var d in dirs)
+                if (CanMove(d)) valid.Add(d);
+            if (valid.Count == 0) valid.Add(-currentDir);
+            switch (ghostType)
             {
-                if (CanMove(d))
-                {
-                    dir = d;
-                    break;
-                }
+                case 1: nextDir = ChooseFarther(valid); break;
+                case 2: nextDir = ChooseCloser(valid); break;
+                case 3: nextDir = valid[Random.Range(0, valid.Count)]; break;
+                case 4: nextDir = ChooseClockwise(valid); break;
             }
         }
-        currentDir = dir;
-        Vector2Int nextPos = gridPos + dir;
+        currentDir = nextDir;
+        Vector2Int nextPos = gridPos + currentDir;
         moveRoutine = StartCoroutine(MoveStep(nextPos));
+    }
+    private Vector2Int ChooseFarther(List<Vector2Int> dirs)
+    {
+        float maxDist = -999f;
+        Vector2Int best = currentDir;
+        Vector3 pacPos = pac.transform.position;
+        Vector3 ghostPos = new Vector3(gridPos.x * gridSize, gridPos.y * gridSize, 0f);
+        foreach (var d in dirs)
+        {
+            float dist = Vector3.Distance(ghostPos + new Vector3(d.x, d.y, 0) * gridSize, pacPos);
+            if (dist > maxDist) { maxDist = dist; best = d; }
+        }
+        return best;
+    }
+    private Vector2Int ChooseCloser(List<Vector2Int> dirs)
+    {
+        float minDist = 999f;
+        Vector2Int best = currentDir;
+        Vector3 pacPos = pac.transform.position;
+        Vector3 ghostPos = new Vector3(gridPos.x * gridSize, gridPos.y * gridSize, 0f);
+        foreach (var d in dirs)
+        {
+            float dist = Vector3.Distance(ghostPos + new Vector3(d.x, d.y, 0) * gridSize, pacPos);
+            if (dist < minDist) { minDist = dist; best = d; }
+        }
+        return best;
+    }
+    private Vector2Int ChooseClockwise(List<Vector2Int> dirs)
+    {
+        Vector2Int right = new Vector2Int(currentDir.y, -currentDir.x);
+        Vector2Int forward = currentDir;
+        Vector2Int left = new Vector2Int(-currentDir.y, currentDir.x);
+
+        if (CanMove(right)) return right;
+        if (CanMove(forward)) return forward;
+        if (CanMove(left)) return left;
+        return -currentDir;
     }
     private IEnumerator MoveStep(Vector2Int newGridPos)
     {
+        if (!movable || CurrentState == GhostState.Dead) yield break;
         if (isMoving) yield break;
         isMoving = true;
         Vector3 start = new Vector3(gridPos.x * gridSize, gridPos.y * gridSize, 0f);
@@ -157,6 +217,7 @@ public class GhostController : MonoBehaviour
     public void SetMovable(bool canMove)
     {
         movable = canMove;
+        if (!movable) HardStop();
         if (canMove && moveRoutine == null && CurrentState != GhostState.Dead)
         {
             Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
@@ -235,51 +296,28 @@ public class GhostController : MonoBehaviour
             yield return null;
         }
         yield return new WaitForSeconds(1f);
-        if (spawnPoint) transform.position = spawnPoint.position;
-        if (spawnPoint != null)
-            transform.position = spawnPoint.position;
-        Vector2 snapped = new Vector2(
-            Mathf.Round(transform.position.x / gridSize) * gridSize,
-            Mathf.Round(transform.position.y / gridSize) * gridSize
-        );
-        transform.position = snapped;
-        gridPos = Vector2Int.RoundToInt(snapped / gridSize);
+        if (spawnPoint != null) transform.position = spawnPoint.position;
+        SnapToGridAt(transform.position);
         CurrentState = GhostState.Normal;
         SetAnim();
         yield return new WaitForSeconds(Random.Range(0.3f, 1.0f));
-        if (movable)
-        {
-            Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
-            currentDir = dirs[Random.Range(0, dirs.Length)];
-            StartCoroutine(MoveStep(gridPos + currentDir));
-        }
-        deadRoutine = null;
         EnsureMoving();
+        deadRoutine = null;
     }
     private void SetAnim()
     {
         if (anim != null)
             anim.SetInteger("State", (int)CurrentState);
     }
-    private IEnumerator WanderRoutine()
-    {
-        while (movable && CurrentState == GhostState.Normal)
-        {
-            yield return new WaitForSeconds(Random.Range(1.5f, 3f)); // 每1.5~3秒换一次方向
-            Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
-            Vector2Int newDir = dirs[Random.Range(0, dirs.Length)];
-            if (CanMove(newDir))
-            {
-                currentDir = newDir;
-                TryStep(currentDir);
-            }
-        }
-    }
     private IEnumerator DelayedStart()
     {
         yield return new WaitForSeconds(Random.Range(0f, 1.5f));
         if (movable && CurrentState == GhostState.Normal)
             StartCoroutine(MoveStep(gridPos + currentDir));
+    }
+    private void OnDisable()
+    {
+        HardStop();
     }
 }
 

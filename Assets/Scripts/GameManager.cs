@@ -110,10 +110,6 @@ public class GameManager : MonoBehaviour
             countdownText.text = s;
             yield return new WaitForSeconds(1f);
         }
-        foreach (var g in ghosts)
-        {
-            g.SetMovable(true);
-        }
         yield return new WaitForSeconds(0.5f);
         if (countdownText) countdownText.gameObject.SetActive(false);
         if (overlayBlocker) overlayBlocker.SetActive(false);
@@ -133,14 +129,11 @@ public class GameManager : MonoBehaviour
             countdownText.text = s;
             yield return new WaitForSeconds(1f);
         }
-        foreach (var g in ghosts)
-        {
-            g.SetMovable(true);
-        }
         yield return new WaitForSeconds(0.5f);
         if (scoreText) scoreText.gameObject.SetActive(true);
         if (livesContainer) livesContainer.gameObject.SetActive(true);
         if (levelNameText) levelNameText.gameObject.SetActive(true);
+        yield return new WaitForSeconds(0.3f);
         if (countdownText) countdownText.gameObject.SetActive(false);
         if (overlayBlocker) overlayBlocker.SetActive(false);
         SetPlayable(true);
@@ -250,9 +243,18 @@ public class GameManager : MonoBehaviour
     }
     private void SetPlayable(bool enableMove)
     {
-        if (pac) pac.SetControllable(enableMove);
-        foreach (var g in ghosts) if (g) g.SetMovable(enableMove);
-        if (exitButton) exitButton.interactable = enableMove == true;
+        if (pac)
+        {
+            pac.SetControllable(enableMove);
+            pac.enabled = enableMove;
+        }
+        foreach (var g in ghosts)
+        {
+            if (!g) continue;
+            g.SetMovable(enableMove);
+            g.enabled = enableMove;
+        }
+        if (exitButton) exitButton.interactable = enableMove;
     }
     public static string FormatTime(float seconds)
     {

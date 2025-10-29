@@ -3,7 +3,14 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Wall
+  - Pellet
+  - PowerPellet
+  - Cherry
+  - Ghost
+  - TeleporterLeft
+  - TeleporterRight
   layers:
   - Default
   - TransparentFX
@@ -11,14 +18,14 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - Ignore Raycast
+  - TeleportLeft
+  - TeleportRight
+  - Wall
+  - Pellet
+  - PowerPellet
+  - Cherry
+  - Ghost
   - 
   - 
   - 
@@ -40,4 +47,7 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: Gameplay
+    uniqueID: 177825869
     locked: 0

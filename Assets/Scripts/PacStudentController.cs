@@ -4,67 +4,76 @@ using UnityEngine;
 
 public class PacStudentController : MonoBehaviour
 {
+    [Header("Movement")]
     public float moveSpeed = 5f;
     public float gridSize = 0.5f;
     public AudioClip moveClip;
     public AudioClip eatClip;
-    public ParticleSystem dustFX;
     private Vector2Int gridPos;
-    private Vector2Int targetGridPos;
     private bool isMoving = false;
     private Vector2Int lastInput;
-    private Vector2Int currentInput;
+    private Vector2Int currentDir;
+    private Vector2 prevWorldPos;
+    private bool controllable = false;
     private AudioSource audioSource;
     private Animator anim;
+
     [Header("Particles")]
+    public ParticleSystem dustFX;
     public GameObject pelletBurstPrefab;
     public GameObject deathBurstPrefab;
+
+    [Header("Teleport")]
+    [SerializeField] private Transform teleportLeft;
+    [SerializeField] private Transform teleportRight;
+
+    [Header("Respawn")]
+    [SerializeField] private Vector2 respawnPoint = new Vector2(-5f, 3f);
+    [SerializeField] private LayerMask wallMask;
+    private Vector2Int targetGridPos;
+    private Vector2 lastSafePos;
     void Start()
     {
-        gridPos = Vector2Int.RoundToInt(transform.position / gridSize);
-        targetGridPos = gridPos;
         audioSource = GetComponent<AudioSource>();
         anim = GetComponent<Animator>();
+        Vector2 snapped = new Vector2(
+            Mathf.Round(transform.position.x / gridSize) * gridSize,
+            Mathf.Round(transform.position.y / gridSize) * gridSize
+        );
+        transform.position = snapped;
+        gridPos = Vector2Int.RoundToInt(snapped / gridSize);
     }
     void Update()
     {
-        Vector2Int input = Vector2Int.zero;
-        if (Input.GetKeyDown(KeyCode.W)) input = Vector2Int.up;
-        if (Input.GetKeyDown(KeyCode.S)) input = Vector2Int.down;
-        if (Input.GetKeyDown(KeyCode.A)) input = Vector2Int.left;
-        if (Input.GetKeyDown(KeyCode.D)) input = Vector2Int.right;
-        if (input != Vector2Int.zero)
-            lastInput = input;
-        if (!isMoving)
+        if (!controllable)
         {
-            TryMove();
+            if (anim) anim.SetBool("isMoving", false);
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.W)) currentDir = Vector2Int.up;
+        else if (Input.GetKeyDown(KeyCode.S)) currentDir = Vector2Int.down;
+        else if (Input.GetKeyDown(KeyCode.A)) currentDir = Vector2Int.left;
+        else if (Input.GetKeyDown(KeyCode.D)) currentDir = Vector2Int.right;
+        if (!isMoving && currentDir != Vector2Int.zero)
+        {
+            if (CanMove(currentDir))
+                StartCoroutine(MoveStep(gridPos + currentDir));
+            else
+                anim.SetBool("isMoving", false);
         }
     }
-    void TryMove()
-    {
-        if (CanMove(lastInput))
-        {
-            currentInput = lastInput;
-            StartCoroutine(LerpTo(gridPos + currentInput));
-        }
-        else if (CanMove(currentInput))
-        {
-            StartCoroutine(LerpTo(gridPos + currentInput));
-        }
-    }
-    IEnumerator LerpTo(Vector2Int newGridPos)
+    IEnumerator MoveStep(Vector2Int newGridPos)
     {
         isMoving = true;
         Vector3 start = new Vector3(gridPos.x * gridSize, gridPos.y * gridSize, 0f);
         Vector3 end = new Vector3(newGridPos.x * gridSize, newGridPos.y * gridSize, 0f);
         float t = 0f;
         anim.SetBool("isMoving", true);
-        Vector2Int dir = newGridPos - gridPos;
-        anim.SetFloat("dirX", dir.x);
-        anim.SetFloat("dirY", dir.y);
+        anim.SetFloat("dirX", currentDir.x);
+        anim.SetFloat("dirY", currentDir.y);
         if (dustFX != null) dustFX.Play();
-        if (dustFX != null) dustFX.Stop();
         if (audioSource && moveClip) audioSource.PlayOneShot(moveClip);
+        lastSafePos = start;
         while (t < 1f)
         {
             t += Time.deltaTime * moveSpeed;
@@ -74,25 +83,140 @@ public class PacStudentController : MonoBehaviour
         transform.position = end;
         gridPos = newGridPos;
         isMoving = false;
-        anim.SetBool("isMoving", false);
         if (dustFX != null) dustFX.Stop();
-        TryMove();
+        if (CanMove(currentDir))
+        {
+            StartCoroutine(MoveStep(gridPos + currentDir));
+        }
+        else
+        {
+            anim.SetBool("isMoving", false);
+        }
+        SnapToGrid();
+    }
+    void TryStep(Vector2Int dir)
+    {
+        if (dir == Vector2Int.zero) return;
+        if (CanMove(dir))
+        {
+            currentDir = dir;
+            StartCoroutine(MoveStep(gridPos + currentDir));
+        }
     }
     bool CanMove(Vector2Int dir)
     {
-        Vector3 origin = new Vector3(gridPos.x * gridSize, gridPos.y * gridSize, -1f);
-        RaycastHit2D hit = Physics2D.Raycast(origin, dir, gridSize);
-        if (hit.collider == null) return true;
-        return !hit.collider.CompareTag("Wall");
+        if (dir == Vector2Int.zero) return false;
+        Vector2 targetPos = (Vector2)(gridPos + dir) * gridSize;
+        Collider2D hit = Physics2D.OverlapBox(
+            targetPos,
+            new Vector2(gridSize * 0.8f, gridSize * 0.8f),
+            0f,
+            wallMask
+        );
+        return hit == null;
     }
-    void SpawnPelletFX(Vector3 at)
+    void OnTriggerEnter2D(Collider2D other)
     {
-        if (pelletBurstPrefab) Instantiate(pelletBurstPrefab, at, Quaternion.identity);
-        AudioManager.I.PlaySFX(AudioManager.I.pelletClip, 0.7f);
+        if (GameManager.I == null) return;
+        Debug.Log("触发到：" + other.name);
+        if (other.CompareTag("Pellet"))
+        {
+            GameManager.I.AddScore(10);
+            if (pelletBurstPrefab) Instantiate(pelletBurstPrefab, other.transform.position, Quaternion.identity);
+            Destroy(other.gameObject);
+            if (audioSource && eatClip) audioSource.PlayOneShot(eatClip);
+        }
+        else if (other.CompareTag("PowerPellet"))
+        {
+            GameManager.I.TriggerPowerPellet();
+            if (pelletBurstPrefab) Instantiate(pelletBurstPrefab, other.transform.position, Quaternion.identity);
+            Destroy(other.gameObject);
+        }
+        else if (other.CompareTag("Cherry"))
+        {
+            GameManager.I.AddScore(100);
+            if (pelletBurstPrefab)
+                Instantiate(pelletBurstPrefab, other.transform.position, Quaternion.identity);
+            Destroy(other.gameObject);
+            if (audioSource && eatClip)
+                audioSource.PlayOneShot(eatClip);
+            Destroy(other.gameObject);
+        }
+        else if (other.CompareTag("Ghost"))
+        {
+            var g = other.GetComponent<GhostController>();
+            if (g == null) return;
+            if (g.CurrentState == GhostController.GhostState.Normal)
+            {
+                StartCoroutine(DoDie());
+            }
+            else if (g.CurrentState == GhostController.GhostState.Scared ||
+                     g.CurrentState == GhostController.GhostState.Recovering)
+            {
+                g.Die();
+                GameManager.I.OnGhostEaten(g);
+            }
+        }
+        else if (other.name.Contains("TeleporterLeft"))
+        {
+            transform.position = new Vector3(8.6f, 1f, 0f);
+        }
+        else if (other.name.Contains("TeleporterRight"))
+        {
+            transform.position = new Vector3(-8.5f, 1f, 0f);
+        }
     }
-    void SpawnDeathFX(Vector3 at)
+    void OnCollisionEnter2D(Collision2D collision)
     {
-        if (deathBurstPrefab) Instantiate(deathBurstPrefab, at, Quaternion.identity);
-        AudioManager.I.PlaySFX(AudioManager.I.deathClip, 1f);
+        if (collision.collider.CompareTag("Wall"))
+        {
+            transform.position = lastSafePos;
+            gridPos = Vector2Int.RoundToInt(lastSafePos / gridSize);
+            if (deathBurstPrefab)
+                Instantiate(deathBurstPrefab, collision.contacts[0].point, Quaternion.identity);
+        }
+    }
+    IEnumerator DoDie()
+    {
+        controllable = false;
+        StopAllCoroutines();
+        isMoving = false;
+        anim.SetTrigger("Die");
+        if (deathBurstPrefab) Instantiate(deathBurstPrefab, transform.position, Quaternion.identity);
+        GameManager.I.LoseOneLifeAndRespawn();
+        yield break;
+    }
+    void SnapToGrid()
+    {
+        Vector2 pos = new Vector2(
+            Mathf.Round(transform.position.x / gridSize) * gridSize,
+            Mathf.Round(transform.position.y / gridSize) * gridSize
+        );
+        transform.position = pos;
+        gridPos = Vector2Int.RoundToInt(pos / gridSize);
+        targetGridPos = gridPos;
+    }
+    void OnRoundReset()
+    {
+        StopAllCoroutines();
+        anim.SetBool("isMoving", false);
+        isMoving = false;
+        Vector2 spawnPos = new Vector2(respawnPoint.x, respawnPoint.y);
+        spawnPos = new Vector2(
+            Mathf.Round(spawnPos.x / gridSize) * gridSize,
+            Mathf.Round(spawnPos.y / gridSize) * gridSize
+        );
+        transform.position = spawnPos;
+        gridPos = Vector2Int.RoundToInt(spawnPos / gridSize);
+        targetGridPos = gridPos;
+    }
+    public void SetControllable(bool value)
+    {
+        controllable = value;
+    }
+    private void StopMoveAnim() { anim.SetBool("isMoving", false); }
+    public void RespawnToStart()
+    {
+        OnRoundReset();
     }
 }

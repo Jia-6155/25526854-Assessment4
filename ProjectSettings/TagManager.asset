@@ -3,7 +3,14 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Wall
+  - Pellet
+  - PowerPellet
+  - Cherry
+  - Ghost
+  - TeleporterLeft
+  - TeleporterRight
   layers:
   - Default
   - TransparentFX
@@ -12,13 +19,13 @@ TagManager:
   - Water
   - UI
   - Ignore Raycast
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - TeleportLeft
+  - TeleportRight
+  - Wall
+  - Pellet
+  - PowerPellet
+  - Cherry
+  - Ghost
   - 
   - 
   - 
